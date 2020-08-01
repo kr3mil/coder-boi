@@ -11,17 +11,19 @@ public class CodingHandler : MonoBehaviour
 	public TextMeshProUGUI DisplayTextTMP;
 	public TMP_InputField InputTextTMP;
 	public List<string> DisplayText = new List<string>();
+	public FarmManager FarmManager;
 
-	private string[] commands = { "help", "clear" };
+	private string[] commands = { "help", "clear", "plant", "harvest", "water" };
 	private string lastCommand = "";
 	private int currentIndex = 0;
 
 	private void Start()
 		{
-		AddToDisplay("Welcome. Type help for a list of commands.");
+		AddToDisplay("<i>Welcome. Type help for a list of commands.</i>");
 		}
+
 	// Update is called once per frame
-	void Update()
+	private void Update()
 		{
 		if (Input.GetKeyDown(KeyCode.Return))
 			{
@@ -52,12 +54,76 @@ public class CodingHandler : MonoBehaviour
 			case "help":
 				DisplayHelpMessage();
 				break;
+
 			case "clear":
 				ClearTerminal();
 				break;
+
+			case "plant":
+				if (ArgsLengthCheck(args, 3))
+					Plant(args);
+				break;
+
+			case "harvest":
+				if (ArgsLengthCheck(args, 3))
+					Harvest(args);
+				break;
+
+			case "water":
+				if (ArgsLengthCheck(args, 3))
+					Water(args);
+				break;
+
 			default:
+				Warn("unknown command");
 				Debug.LogWarning("UNHANDLED COMMAND: " + args[0]);
 				break;
+			}
+		}
+
+	private bool ArgsLengthCheck(string[] args, int length)
+		{
+		if (args.Length == length)
+			{
+			return true;
+			}
+		Warn(args[0] + " requires " + (length - 1) + " parameters");
+		return false;
+		}
+
+	private void Plant(string[] args)
+		{
+		if (FarmManager.Plant(int.Parse(args[1]), int.Parse(args[2])))
+			{
+			Say("seed planted at " + args[1] + " " + args[2]);
+			}
+		else
+			{
+			Warn("can't plant seed at " + args[1] + args[2]);
+			}
+		}
+
+	private void Harvest(string[] args)
+		{
+		if (FarmManager.Harvest(int.Parse(args[1]), int.Parse(args[2])))
+			{
+			Say("tile " + args[1] + " " + args[2] + " harvested");
+			}
+		else
+			{
+			Warn("tile is not ready to harvest");
+			}
+		}
+
+	private void Water(string[] args)
+		{
+		if (FarmManager.Water(int.Parse(args[1]), int.Parse(args[2])))
+			{
+			Say("tile " + args[1] + " " + args[2] + " watered");
+			}
+		else
+			{
+			Warn("tile is already watered");
 			}
 		}
 
@@ -70,9 +136,24 @@ public class CodingHandler : MonoBehaviour
 
 	private void DisplayHelpMessage()
 		{
-		AddToDisplay("AVAILABLE COMMANDS");
+		AddToDisplay("<b>AVAILABLE COMMANDS</b>");
 		AddToDisplay("help - displays commands list");
 		AddToDisplay("clear - clears the terminal");
+		AddToDisplay("plant x y - plants a seed at x y");
+		AddToDisplay("water x y - waters tile at x y");
+		AddToDisplay("harvest x y - harvest crop at x y");
+		}
+
+	private void Warn(string txt)
+		{
+		txt = "<color=#FF0000>" + txt + "</color>";
+		AddToDisplay(txt);
+		}
+
+	private void Say(string txt)
+		{
+		txt = "<i>" + txt + "</i>";
+		AddToDisplay(txt);
 		}
 
 	private void AddToDisplay(string txt)
