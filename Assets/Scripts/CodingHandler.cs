@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -11,7 +12,6 @@ public class CodingHandler : MonoBehaviour
   public TextMeshProUGUI DisplayTextTMP;
   public TextMeshProUGUI BackgroundTextTMP;
   public TMP_InputField InputTextTMP;
-  public List<string> DisplayText = new List<string>();
   public List<string> UserInput = new List<string>();
   public FarmManager FarmManager;
 
@@ -21,11 +21,14 @@ public class CodingHandler : MonoBehaviour
   private string[] commands = { "help", "clear", "plant", "harvest", "water", "upgrades", "upgrade" };
   private string lastCommand = "";
   private int currentIndex = 0;
+  private bool displayingText = false;
+
+  private List<Tuple<string, bool>> DisplayTextQueue = new List<Tuple<string, bool>>();
 
   private void Start()
   {
     Array.Sort(commands, (x, y) => String.Compare(x, y));
-    AddToDisplay("<i>Welcome. Type help for a list of commands.</i>");
+    AddToDisplay("Welcome. Type help for a list of commands.", false);
   }
 
   // Update is called once per frame
@@ -123,7 +126,7 @@ public class CodingHandler : MonoBehaviour
   {
     if (FarmManager.Plant(int.Parse(args[1]), int.Parse(args[2])))
     {
-      Say("seed planted at " + args[1] + " " + args[2]);
+      AddToDisplay("seed planted at " + args[1] + " " + args[2], false);
     }
     else
     {
@@ -135,7 +138,7 @@ public class CodingHandler : MonoBehaviour
   {
     if (FarmManager.Harvest(int.Parse(args[1]), int.Parse(args[2])))
     {
-      Say("tile " + args[1] + " " + args[2] + " harvested");
+      AddToDisplay("tile " + args[1] + " " + args[2] + " harvested", false);
     }
     else
     {
@@ -147,7 +150,7 @@ public class CodingHandler : MonoBehaviour
   {
     if (FarmManager.Water(int.Parse(args[1]), int.Parse(args[2])))
     {
-      Say("tile " + args[1] + " " + args[2] + " watered");
+      AddToDisplay("tile " + args[1] + " " + args[2] + " watered", false);
     }
     else
     {
@@ -174,7 +177,6 @@ public class CodingHandler : MonoBehaviour
 
   private void ClearTerminal()
   {
-    DisplayText.Clear();
     DisplayTextTMP.text = "";
     InputTextTMP.text = "";
   }
@@ -184,14 +186,14 @@ public class CodingHandler : MonoBehaviour
     switch (page)
     {
       case 1:
-        AddToDisplay("<b>AVAILABLE COMMANDS</b>");
-        AddToDisplay("help x - displays commands list page x");
-        AddToDisplay("clear - clears the terminal");
-        AddToDisplay("plant x y - plants a seed at x y");
-        AddToDisplay("water x y - waters tile at x y");
-        AddToDisplay("harvest x y - harvests crop at x y");
-        AddToDisplay("upgrades - lists available upgrades");
-        AddToDisplay("upgrade name - buys specified upgrade");
+        AddToDisplay("<b>AVAILABLE COMMANDS</b>", false);
+        AddToDisplay("help x - displays commands list page x", false);
+        AddToDisplay("clear - clears the terminal", false);
+        AddToDisplay("plant x y - plants a seed at x y", false);
+        AddToDisplay("water x y - waters tile at x y", false);
+        AddToDisplay("harvest x y - harvests crop at x y", false);
+        AddToDisplay("upgrades - lists available upgrades", false);
+        AddToDisplay("upgrade name - buys specified upgrade", false);
         break;
       case 2:
         break;
@@ -204,16 +206,16 @@ public class CodingHandler : MonoBehaviour
   private void Warn(string txt)
   {
     txt = "<color=#FF0000>" + txt + "</color>";
-    AddToDisplay(txt);
+    AddToDisplay(txt, false);
   }
 
   private void Say(string txt)
   {
     txt = "<i>" + txt + "</i>";
-    AddToDisplay(txt);
+    AddToDisplay(txt, false);
   }
 
-  private void AddToDisplay(string txt)
+  private void AddToDisplay(string txt, bool isUser)
   {
     string[] splitTxt = txt.Split(' ');
     for (int i = 0; i < splitTxt.Length; i++)
@@ -226,15 +228,87 @@ public class CodingHandler : MonoBehaviour
     }
     string finalTxt = string.Join(" ", splitTxt);
 
-    DisplayText.Add("<color=#00FFFF>></color>  " + finalTxt);
-
-    DisplayTextTMP.text = string.Join("\n", DisplayText);
+    DisplayTextQueue.Add(new Tuple<string, bool>("<color=#00FFFF>></color>  " + finalTxt, isUser));
+    if (!displayingText)
+    {
+      StartCoroutine(ShowText());
+    }
     InputTextTMP.text = "";
+  }
+
+  IEnumerator ShowText()
+  {
+    if (DisplayTextQueue.Count > 0)
+    {
+      displayingText = true;
+      var fullText = DisplayTextQueue.First().Item1;
+      var isUser = DisplayTextQueue.First().Item2;
+      //var isUser = true;
+
+      Debug.Log("Displaying: " + fullText);
+
+      if (DisplayTextTMP.text != "")
+      {
+        DisplayTextTMP.text += "\n";
+      }
+
+      if (!isUser)
+      {
+        List<string> groups = new List<string>();
+
+        // Group colour and letters into each
+        while (fullText.Length > 0)
+        {
+          string group = fullText[0].ToString();
+
+          // Check for colour
+          if (group == "<")
+          {
+            if (fullText.StartsWith("<color"))
+            {
+              group = fullText.Substring(0, fullText.IndexOf("</color>") + 8);
+              fullText = fullText.Substring(fullText.IndexOf("</color>") + 7);
+            }
+            else if (fullText.StartsWith("<b"))
+            {
+              group = fullText.Substring(0, fullText.IndexOf("</b>") + 4);
+              fullText = fullText.Substring(fullText.IndexOf("</b>") + 3);
+            }
+            else if (fullText.StartsWith("<i"))
+            {
+              group = fullText.Substring(0, fullText.IndexOf("</i>") + 4);
+              fullText = fullText.Substring(fullText.IndexOf("</i>") + 3);
+            }
+          }
+          groups.Add(group);
+          fullText = fullText.Substring(1);
+        }
+
+        foreach (var group in groups)
+        {
+          yield return new WaitForSeconds(.02f);
+          DisplayTextTMP.text += group;
+        }
+      }
+      else
+      {
+        DisplayTextTMP.text += fullText;
+      }
+      DisplayTextQueue.RemoveAt(0);
+    }
+    if (DisplayTextQueue.Count > 0)
+    {
+      StartCoroutine(ShowText());
+    }
+    else
+    {
+      displayingText = false;
+    }
   }
 
   private void AppendDisplayText(string txt)
   {
-    AddToDisplay(txt);
+    AddToDisplay(txt, true);
     Debug.Log("Added " + txt + " to user input list");
     UserInput.Add(txt);
     lastCommand = txt;
